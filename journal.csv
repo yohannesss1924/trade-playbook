@@ -1,0 +1,2 @@
+signal_date,ticker,sector,entry,limit,stop,target,shares,risk,status,fill_date,fill,exit_date,exit,R,pnl
+2026-10-10,SONO,Technology,17.3,17.36,16.54,19.95,131,0.76,pending,,,,,,
