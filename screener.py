@@ -105,6 +105,15 @@ def download(tickers):
     data = yf.download(tickers, period="1y", interval="1d", group_by="ticker",
                        auto_adjust=False, progress=False, threads=True)
     out = {}
+
+    def got(t):
+        try:
+            d = data[t] if isinstance(data.columns, pd.MultiIndex) else data
+            return not d.dropna(subset=["Close"]).empty
+        except KeyError:
+            return False
+    # When most of the batch failed, Yahoo is unreachable: don't retry one by one.
+    retry = sum(map(got, tickers)) >= len(tickers) / 2
     for t in tickers:
         try:
             d = data[t] if isinstance(data.columns, pd.MultiIndex) else data
@@ -112,6 +121,8 @@ def download(tickers):
             if d.empty:
                 raise KeyError(t)
         except KeyError:
+            if not retry:
+                continue
             # Threaded downloads sometimes drop a ticker; retry it alone.
             d = yf.download(t, period="1y", interval="1d", auto_adjust=False,
                             progress=False, threads=False, multi_level_index=False)
@@ -477,6 +488,10 @@ def main():
     tickers = list(watch)
     bars = download(tickers)
     no_data = [t for t in tickers if t not in bars]
+    if len(no_data) > len(tickers) / 2:
+        # Most likely Yahoo is unreachable; a "no trades" report would be false.
+        sys.exit(f"Price data missing for {len(no_data)} of {len(tickers)} tickers; "
+                 "Yahoo Finance looks unreachable. No report written.")
 
     results = [analyze(t, bars[t]) for t in tickers if t in bars]
     built = sorted((r for r in results if r["fail"] is None), key=lambda r: -r["R"])
